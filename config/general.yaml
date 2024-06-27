@@ -1,5 +1,5 @@
 paths:
-  project: ${hydra.runtime.cwd}
+  project: ${hydra:runtime.cwd}
   raw_data: ${.project}\data\raw
   models: ${.project}\models
   shares_dict: ${.project}\config\shares.yaml
@@ -31,6 +31,10 @@ data:
     api_wait_time: 1.1
     gather_function:
       _target_: src.data.mean_volume_gather.get_mean_volumes
-
+  data_gather:
+    buffer_write_delay: 100
+    orderbook_depth: 10
+    single_data_write_delay: 35
+    request_delay: 5
 random_state: 424242
 

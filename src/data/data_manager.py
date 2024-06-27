@@ -3,10 +3,22 @@ import json
 import ast
 from polars import read_csv, DataFrame
 from typing import Union
-import csv
 from datetime import datetime, timedelta
 import hydra
 from omegaconf import DictConfig
+
+class NullDataManager():
+    def __init__(self) -> None:
+        pass
+
+    def write_share(self, figi, content, mode='a') -> None:
+        pass
+
+    def write_trend(self, content, mode='a') -> None:
+        pass
+
+    def write_alerts(self, content, mode='a') -> None:
+        pass
 
 class DataManager:
     def __init__(self, cfg: DictConfig):

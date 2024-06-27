@@ -1,20 +1,27 @@
 from omegaconf import OmegaConf, DictConfig
 import hydra
+from src.data.data_gather import DataCollector
 from src.data.data_manager import DataManager
 import config
+import asyncio
 import yaml
 import polars as pl
 import logging
 
-logging.getLogger("tinkoff.invest.logging").setLevel(logging.WARNING)
+class Observer:
+    def update(self, data: dict):
+        print("Data recieved")
+        print(data)
+
+logging.getLogger("tinkoff.invest.logging").setLevel(logging.INFO)
 
 config.update_files()
+test_observer = Observer()
 
-# @hydra.main(version_base=None, config_path='D:/Tinkoff-Trade-Assistant/config', config_name='general.yaml')
-# def main(cfg: DictConfig) -> None:
-#     dm = DataManager(cfg)   
-#     data_point = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-#     dm.write_share('BBG0100R9963', data_point)
-#     sh = dm.load_share('BBG0100R9963')
-#     print(sh)
-# main()
+@hydra.main(version_base=None, config_path='D:/Tinkoff-Trade-Assistant/config', config_name='general.yaml')
+def main(cfg: DictConfig) -> None:
+    dc = DataCollector(cfg)
+    dc.attach(test_observer)
+    asyncio.run(dc.run())
+
+main()
