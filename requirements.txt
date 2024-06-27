@@ -1,0 +1,10 @@
+black
+flake8
+isort
+hydra-core
+omegaconf
+tinkoff-investments
+mkdocs
+pip
+python-dotenv
+-e .

@@ -1,0 +1,36 @@
+paths:
+  project: ${hydra.runtime.cwd}
+  raw_data: ${.project}\data\raw
+  models: ${.project}\models
+  shares_dict: ${.project}\config\shares.yaml
+  mean_volume_log: ${.project}\data\mean_volumes.json
+  alerts: ${.project}\data\alerts.json
+  trend_data: ${.project}\data\trend
+
+tokens:
+  TOKEN: 'Provide your Tinkoff API token'
+  TOKEN_SANDBOX: 'Provide your Tinkoff API sandbox token'
+  TELEGRAM_TOKEN: 'Provide your Telegram API token'
+
+data:
+  raw_data_filename: market_log
+  raw_data_columns:
+    - buyers_count
+    - buyers_quantity
+    - sellers_count
+    - sellers_quantity
+    - price
+    - bids
+    - asks
+    - weighted_bid
+    - weighted_ask
+  mean_volume:
+    update_interval_days: 2
+    candle_interval: 15_MIN
+    mean_interval: 7
+    api_wait_time: 1.1
+    gather_function:
+      _target_: src.data.mean_volume_gather.get_mean_volumes
+
+random_state: 424242
+
