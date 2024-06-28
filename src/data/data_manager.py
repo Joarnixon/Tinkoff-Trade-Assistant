@@ -109,6 +109,12 @@ class DataManager:
             f.write(','.join(self.cfg.data.raw_data_columns) + '\n')
 
     def write_trend(self, content, mode='a') -> None:
-        file_path = os.path.join(self.cfg.paths.trend_data, f'{self.cfg.data.raw_data_filename}.csv')
-        with open(file_path, mode) as file:
-            file.write(content)
+        file_exists = os.path.isfile(self.cfg.paths.trend_data)
+        
+        if not file_exists:
+            with open(self.cfg.paths.trend_data, mode='w') as f:
+                f.write(','.join(self.cfg.data.trend_data_columns) + '\n')
+
+        with open(self.cfg.paths.trend_data, mode=mode) as f:
+            dataframe = DataFrame(content, schema=self.cfg.data.trend_data_columns)
+            dataframe.write_csv(f, include_header=False)

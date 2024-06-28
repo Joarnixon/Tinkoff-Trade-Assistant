@@ -1,5 +1,5 @@
 import asyncio
-from abc import ABC, abstractmethod
+from .observer import Observer 
 from .data_manager import DataManager, NullDataManager
 from typing import Optional
 import time
@@ -32,11 +32,6 @@ class Data:
     sellers_quantity: int = 0
     price: float = 0
     last_price: float = 0
-
-class Observer(ABC):
-    @abstractmethod
-    def update(self, data: dict):
-        pass
 
 class Subject:
     def __init__(self):
