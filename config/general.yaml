@@ -5,25 +5,34 @@ paths:
   shares_dict: ${.project}\config\shares.yaml
   mean_volume_log: ${.project}\data\mean_volumes.json
   alerts: ${.project}\data\alerts.json
-  trend_data: ${.project}\data\trend
+  trend_data: ${.project}\data\trend.csv
 
 tokens:
-  TOKEN: 'Provide your Tinkoff API token'
-  TOKEN_SANDBOX: 'Provide your Tinkoff API sandbox token'
+  TOKEN: 
+  TOKEN_SANDBOX: 
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
   raw_data_filename: market_log
-  raw_data_columns:
+  raw_data_trades_columns:
+    - time
     - buyers_count
     - buyers_quantity
     - sellers_count
     - sellers_quantity
+  raw_data_orderbook_columns:
     - price
     - bids
     - asks
     - weighted_bid
     - weighted_ask
+    - bid_to_ask_ratio
+  trend_data_columns:
+    - time
+    - buy_count
+    - buy_quantity
+    - sell_count
+    - sell_quantity
   mean_volume:
     update_interval_days: 2
     candle_interval: 15_MIN
@@ -32,9 +41,22 @@ data:
     gather_function:
       _target_: src.data.mean_volume_gather.get_mean_volumes
   data_gather:
-    buffer_write_delay: 100
+    buffer_write_delay: 500
     orderbook_depth: 10
     single_data_write_delay: 35
     request_delay: 5
+    orderbook_processes: # should be at least one
+      - min
+      - max
+      - std
+      - last
 random_state: 424242
+
+trend_scan:
+    time_delay: 60
+volume_scan:
+    session_time: 1_MIN # 1_MIN, 2_MIN, 3_MIN, 5_MIN, 10_MIN, 15_MIN available.
+    time_delay: 60
+    price_change_threshold: 0.2
+    bigger_by_factor: 1
 

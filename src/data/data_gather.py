@@ -1,10 +1,11 @@
 import asyncio
 from .observer import Observer 
 from .data_manager import DataManager, NullDataManager
-from typing import Optional
+from .data_preprocess import OrderBookPreprocessor
+from typing import Optional, Union
 import time
 import yaml
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import polars as pl
 from tinkoff.invest.utils import now, quotation_to_decimal as qtd
 from tinkoff.invest import (
@@ -22,16 +23,17 @@ from tinkoff.invest import (
 @dataclass
 class Data:
     figi: str
-    bids: float = 0
-    asks: float = 0
     buyers_count: int = 0
     buyers_quantity: int = 0
-    weighted_bid: float = 0
-    weighted_ask: float = 0
     sellers_count: int = 0
     sellers_quantity: int = 0
-    price: float = 0
     last_price: float = 0
+    bids: dict = field(default_factory=dict)
+    asks: dict = field(default_factory=dict)
+    weighted_bid: dict = field(default_factory=dict)
+    weighted_ask: dict = field(default_factory=dict)
+    price: dict = field(default_factory=dict)
+    bid_to_ask_ratio: dict = field(default_factory=dict)
 
 class Subject:
     def __init__(self):
@@ -56,7 +58,7 @@ class DataBuffer(Data):
     data_manager (DataManager, optional): An instance of DataManager to handle data storage.
     Defaults to NullDataManager if not provided and will not save anything.
     """
-    def __init__(self, figi: str, data_manager: Optional[DataManager], buffer_write_delay):
+    def __init__(self, figi: str, data_manager: Union[DataManager, NullDataManager], buffer_write_delay):
         super().__init__(figi)
         self.data_buffer = []
         self.buffer_write_delay = buffer_write_delay
@@ -69,10 +71,12 @@ class DataBuffer(Data):
         self.buyers_quantity = 0
         self.sellers_count = 0
         self.sellers_quantity = 0
-        self.bids = 0
-        self.asks = 0
-        self.weighted_ask = 0
-        self.weighted_bid = 0
+        self.price = {}
+        self.bids = {}
+        self.asks = {}
+        self.weighted_bid = {}
+        self.weighted_ask = {}
+        self.bid_to_ask_ratio = {}
 
     def append(self, data_point):
         self.data_buffer.append(data_point)
@@ -94,10 +98,11 @@ class DataCollector(Subject):
     cfg (Config): A configuration object containing necessary parameters.
     data_manager (DataManager, optional): An instance of DataManager to handle data storage.
     """
-    def __init__(self, cfg, data_manager=None):
+    def __init__(self, cfg, data_manager: Optional[DataManager] = None):
         super().__init__()
         self.cfg = cfg
         self.data_manager = data_manager if data_manager is not None else NullDataManager()
+        self.orderbook_preprocessor = OrderBookPreprocessor(processes=self.cfg.data.data_gather.orderbook_processes)
 
         with open(cfg.paths.shares_dict, 'r', encoding='utf-8') as file:
             stocks_figi = list(yaml.safe_load(file).keys()) # only figi needed
@@ -108,7 +113,7 @@ class DataCollector(Subject):
         self.request_delay = cfg.data.data_gather.request_delay
         self.single_data_write_delay = cfg.data.data_gather.single_data_write_delay
 
-
+    # Modify this to take more data if you know how. Change columns in config
     @staticmethod
     def _update_share_data_trade(share: DataBuffer, trade):
         share.last_price = qtd(trade.price)
@@ -119,13 +124,26 @@ class DataCollector(Subject):
             share.sellers_count += 1
             share.sellers_quantity += trade.quantity
 
+    # Modify this to take more data if you know how. Change columns in config
     @staticmethod
     def _update_share_data_orderbook(share: DataBuffer, orderbook):
-        share.bids = sum([bid.quantity for bid in orderbook.bids])
-        share.asks = sum([ask.quantity for ask in orderbook.asks])
-        share.weighted_bid = round(sum([bid.quantity * qtd(bid.price) for bid in orderbook.bids]) / share.bids, 5)
-        share.weighted_ask = round(sum([ask.quantity * qtd(ask.price) for ask in orderbook.asks]) / share.asks, 5)
-        share.price = share.last_price
+        timestamp = int(time.time())
+        share.bids[timestamp] = sum([bid.quantity for bid in orderbook.bids])
+        share.asks[timestamp] = sum([ask.quantity for ask in orderbook.asks])
+        share.weighted_bid[timestamp] = round(sum([bid.quantity * qtd(bid.price) for bid in orderbook.bids]) / share.bids, 5)
+        share.weighted_ask[timestamp] = round(sum([ask.quantity * qtd(ask.price) for ask in orderbook.asks]) / share.asks, 5)
+        share.price[timestamp] = share.last_price
+        share.bid_to_ask_ratio[timestamp] = round(share.bids[timestamp] / share.asks[timestamp], 5)
+    
+    def make_datapoint(self, share: DataBuffer, trade):
+        share.price = qtd(trade.price)
+
+        orderbook_features = self.orderbook_preprocessor.transform([getattr(share, column) for column in self.cfg.data.raw_data_orderbook_columns])
+        data_point = list(map(float, [int(time.time())] + [getattr(share, column) for column in self.cfg.data.raw_data_trades_columns] + orderbook_features))
+        share.append(data_point)
+        self.notify({trade.figi: data_point})  # Notify listeners with new data
+        share.reset_data()
+        share.last_write_time = time.time()
 
     async def collect(self):
         async def request_iterator():
@@ -152,14 +170,7 @@ class DataCollector(Subject):
 
                     self._update_share_data_trade(share, marketdata.trade)
                     if time.time() - share.last_write_time > self.single_data_write_delay: 
-                        share.price = qtd(marketdata.trade.price)
-                        data_point = list(map(float, [share.buyers_count, share.buyers_quantity, share.sellers_count,
-                                    share.sellers_quantity, share.price, share.bids,
-                                    share.asks, share.weighted_bid, share.weighted_ask]))
-                        share.append(data_point)
-                        self.notify({marketdata.trade.figi: data_point})  # Notify listeners with new data
-                        share.reset_data()
-                        share.last_write_time = time.time()
+                        self.make_datapoint(share, marketdata.trade)
 
                 if marketdata.orderbook is not None:
                     share = self.shares_dict[marketdata.orderbook.figi]

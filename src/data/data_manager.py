@@ -24,6 +24,9 @@ class DataManager:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
+        share_columns_count = len(self.cfg.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * len(self.cfg.data.data_gather.orderbook_processes)
+        self.share_schema = [f"{i}" for i in range(share_columns_count)] # will be discarded anyway
+
     def _write_mean_volume_log(self, mean_volume):
         current_time = datetime.now()
         log_data = {
@@ -97,16 +100,18 @@ class DataManager:
         with open(file_path, mode=mode) as f:
             if isinstance(content, list):
                 assert isinstance(content[0], list), "Check the number of data dimensions"
-                dataframe = DataFrame(content, schema=self.cfg.data.raw_data_columns)
+                dataframe = DataFrame(content, schema=self.share_schema)
             else:
-                assert content.shape[1] == len(self.cfg.data.raw_data_columns), "DataFrame must have the same number of columns as raw_data_columns"
+                assert content.shape[1] == len(self.share_schema), "DataFrame must have the same number of columns as specified in config"
                 dataframe = content
             dataframe.write_csv(f, include_header=False)
 
     def clear_share(self, figi: str):
         file_path = os.path.join(self.cfg.paths.raw_data, figi, f'{self.cfg.data.raw_data_filename}.csv')
+        raw_data_orderbook_columns = [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in self.cfg.data.data_gather.orderbook_processes]
+        raw_data_columns = self.cfg.data.raw_data_trades_columns + raw_data_orderbook_columns
         with open(file_path, 'w') as f:
-            f.write(','.join(self.cfg.data.raw_data_columns) + '\n')
+            f.write(','.join(raw_data_columns) + '\n')
 
     def write_trend(self, content, mode='a') -> None:
         file_exists = os.path.isfile(self.cfg.paths.trend_data)

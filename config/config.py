@@ -45,7 +45,7 @@ def get_all_shares(token) -> dict:
 def update_files(cfg: DictConfig) -> None:
     '''
     Retrieves all available shares from the Tinkoff Invest API and updates the shares.yaml file.
-    Creates new folders for storing the shares backlog files.
+    Creates new folders for storing the shares backlog files. All stored data will be reset.
     '''
     update_shares(cfg)
     update_backlog(cfg)
@@ -76,10 +76,13 @@ def update_backlog(cfg: DictConfig) -> None:
         folder_path = os.path.join(cfg.paths.raw_data, figi)
         os.makedirs(folder_path, exist_ok=True)
         # create csv
+        
         file_path = os.path.join(folder_path, f'{cfg.data.raw_data_filename}.csv')
+        raw_data_orderbook_columns = [f"{column}_{proc}" for column in cfg.data.raw_data_orderbook_columns for proc in cfg.data.data_gather.orderbook_processes]
+        raw_data_columns = cfg.data.raw_data_trades_columns + raw_data_orderbook_columns
         with open(file_path, 'w') as f:
-            f.write(','.join(cfg.data.raw_data_columns) + '\n')
-    # remove any delisted shares
+            f.write(','.join(raw_data_columns) + '\n')
+    # remove any delisted share
     for figi in delisted_figis:
         folder_path = os.path.join(cfg.paths.raw_data, figi)
         os.rmdir(folder_path)
