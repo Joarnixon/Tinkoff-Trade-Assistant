@@ -8,8 +8,8 @@ paths:
   trend_data: ${.project}\data\trend.csv
 
 tokens:
-  TOKEN: 't.hRIUmXEfJaWlTRtMPR8L80TPp-Dt8Pw9tzC4DRyj7GbIWNwS76oQKkCGVN-m1ru-kYm0qYbUb97k0OzA0daCeQ'
-  TOKEN_SANDBOX: 't.fZOYMWjQfUMzBjmehVN2SChqmCkVwIXgy9noi5EP-vo0LHOxAL62jgYTt6mIZGqQXLYGYzgPRQYaEUj6rcgiQw'
+  TOKEN: 
+  TOKEN_SANDBOX: 
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
@@ -70,6 +70,6 @@ volume_scan:
     time_delay: 60
     price_change_threshold: 0.2
     bigger_by_factor: 1
-    
+
 random_state: 424242
 
