@@ -1,5 +1,5 @@
 paths:
-  project: ${hydra:runtime.cwd}
+  project: ${hydra.runtime.cwd}
   raw_data: ${.project}\data\raw
   models: ${.project}\models
   shares_dict: ${.project}\config\shares.yaml
@@ -8,8 +8,8 @@ paths:
   trend_data: ${.project}\data\trend.csv
 
 tokens:
-  TOKEN: 
-  TOKEN_SANDBOX: 
+  TOKEN: 't.hRIUmXEfJaWlTRtMPR8L80TPp-Dt8Pw9tzC4DRyj7GbIWNwS76oQKkCGVN-m1ru-kYm0qYbUb97k0OzA0daCeQ'
+  TOKEN_SANDBOX: 't.fZOYMWjQfUMzBjmehVN2SChqmCkVwIXgy9noi5EP-vo0LHOxAL62jgYTt6mIZGqQXLYGYzgPRQYaEUj6rcgiQw'
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
@@ -33,6 +33,17 @@ data:
     - buy_quantity
     - sell_count
     - sell_quantity
+  data_labeling:
+    time_column_name: time # modify this too if you modified any of the columns above
+    price_column_name: price_last
+    percent_change_threshold: 0.5
+    min_time_interval: 15
+    max_time_interval: 300
+    label_meaning:
+      1: Buy
+      0: Hold
+      -1: Sell
+
   mean_volume:
     update_interval_days: 2
     candle_interval: 15_MIN
@@ -45,13 +56,13 @@ data:
     orderbook_depth: 10
     single_data_write_delay: 35
     request_delay: 5
-    orderbook_processes: # should be at least one
+    orderbook_processes:
       - min
       - max
       - std
-      - last
-random_state: 424242
-
+features:
+  - buy_sell_quantity_ratio
+  - slope
 trend_scan:
     time_delay: 60
 volume_scan:
@@ -59,4 +70,6 @@ volume_scan:
     time_delay: 60
     price_change_threshold: 0.2
     bigger_by_factor: 1
+    
+random_state: 424242
 

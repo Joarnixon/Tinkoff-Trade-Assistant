@@ -4,7 +4,7 @@ from typing import Optional
 
 class OrderBookPreprocessor:
     def __init__(self, processes):
-        self.pipeline = [getattr(self, proc) for proc in processes]
+        self.pipeline = [self.last] + [getattr(self, proc) for proc in processes]
         
     def transform(self, data: list[dict[int, float]]) -> list[float]:
         result = []

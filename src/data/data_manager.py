@@ -24,7 +24,7 @@ class DataManager:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-        share_columns_count = len(self.cfg.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * len(self.cfg.data.data_gather.orderbook_processes)
+        share_columns_count = len(self.cfg.data.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * len(self.cfg.data.data_gather.orderbook_processes)
         self.share_schema = [f"{i}" for i in range(share_columns_count)] # will be discarded anyway
 
     def _write_mean_volume_log(self, mean_volume):
