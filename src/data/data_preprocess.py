@@ -1,10 +1,8 @@
 import numpy as np
-from src.data.data_manager import DataManager, NullDataManager
-from typing import Optional
 
 class OrderBookPreprocessor:
     def __init__(self, processes):
-        self.pipeline = [self.last] + [getattr(self, proc) for proc in processes]
+        self.pipeline = [getattr(self, proc) for proc in processes] + [self.last]
         
     def transform(self, data: list[dict[int, float]]) -> list[float]:
         result = []
@@ -14,24 +12,22 @@ class OrderBookPreprocessor:
         return result
 
     def last(self, feature_dict: dict[int, float]) -> float:
-        last_timestamp = max(feature_dict.keys())
-        return feature_dict[last_timestamp]
+        return next(reversed(feature_dict.values()), np.nan)
 
     def min(self, feature_dict: dict[int, float]) -> float:
-        return min(feature_dict.values())
+        return min(feature_dict.values(), default=np.nan)
 
     def max(self, feature_dict: dict[int, float]) -> float:
-        return max(feature_dict.values())
+        return max(feature_dict.values(), default=np.nan)
     
     def std(self, feature_dict: dict[int, float]) -> float:
-        return np.std(list(feature_dict.values()))
+        return np.std(list(feature_dict.values())) if feature_dict else np.nan
     
 class DataPreprocessor:
-    def __init__(self, cfg, data_manager: Optional[DataManager]):
+    def __init__(self, cfg):
         self.cfg = cfg
-        self.data_manager = data_manager if data_manager is not None else NullDataManager()
     
-    def transform(self, data):
-        pass
+    def __call__(self, data):
+        return data
     
     

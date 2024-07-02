@@ -1,4 +1,5 @@
 import asyncio
+from numpy import nan
 from .observer import Observer 
 from .data_manager import DataManager, NullDataManager
 from .data_preprocess import OrderBookPreprocessor
@@ -19,6 +20,7 @@ from tinkoff.invest import (
     TradeInstrument,
     TradeDirection
 )
+from tinkoff.invest.exceptions import AioRequestError
 
 @dataclass
 class Data:
@@ -34,6 +36,10 @@ class Data:
     weighted_ask: dict = field(default_factory=dict)
     price: dict = field(default_factory=dict)
     bid_to_ask_ratio: dict = field(default_factory=dict)
+
+    @property
+    def time(self):
+        return int(time.time())
 
 class Subject:
     def __init__(self):
@@ -77,6 +83,7 @@ class DataBuffer(Data):
         self.weighted_bid = {}
         self.weighted_ask = {}
         self.bid_to_ask_ratio = {}
+        # not last_price
 
     def append(self, data_point):
         self.data_buffer.append(data_point)
@@ -113,6 +120,11 @@ class DataCollector(Subject):
         self.request_delay = cfg.data.data_gather.request_delay
         self.single_data_write_delay = cfg.data.data_gather.single_data_write_delay
 
+        # set initial price
+        with Client(cfg.tokens.TOKEN) as client:
+            for share in list(self.shares_dict.values()):
+                share.last_price = qtd(client.market_data.get_last_prices(figi=[share.figi]).last_prices[0].price)
+
     # Modify this to take more data if you know how. Change columns in config
     @staticmethod
     def _update_share_data_trade(share: DataBuffer, trade):
@@ -128,18 +140,26 @@ class DataCollector(Subject):
     @staticmethod
     def _update_share_data_orderbook(share: DataBuffer, orderbook):
         timestamp = int(time.time())
-        share.bids[timestamp] = sum([bid.quantity for bid in orderbook.bids])
-        share.asks[timestamp] = sum([ask.quantity for ask in orderbook.asks])
-        share.weighted_bid[timestamp] = round(sum([bid.quantity * qtd(bid.price) for bid in orderbook.bids]) / share.bids, 5)
-        share.weighted_ask[timestamp] = round(sum([ask.quantity * qtd(ask.price) for ask in orderbook.asks]) / share.asks, 5)
-        share.price[timestamp] = share.last_price
-        share.bid_to_ask_ratio[timestamp] = round(share.bids[timestamp] / share.asks[timestamp], 5)
+        try:
+            share.price[timestamp] = share.last_price
+            share.bids[timestamp] = sum([bid.quantity for bid in orderbook.bids])
+            share.asks[timestamp] = sum([ask.quantity for ask in orderbook.asks])
+            share.weighted_bid[timestamp] = round(sum([bid.quantity * qtd(bid.price) for bid in orderbook.bids]) / share.bids[timestamp], 5)
+            share.weighted_ask[timestamp] = round(sum([ask.quantity * qtd(ask.price) for ask in orderbook.asks]) / share.asks[timestamp], 5)
+            share.bid_to_ask_ratio[timestamp] = round(share.bids[timestamp] / share.asks[timestamp], 5)
+        except ZeroDivisionError:
+            share.price[timestamp] = nan
+            share.bids[timestamp] = nan
+            share.asks[timestamp] = nan
+            share.weighted_bid[timestamp] = nan
+            share.weighted_ask[timestamp] = nan
+            share.bid_to_ask_ratio[timestamp] = nan
     
     def make_datapoint(self, share: DataBuffer, trade):
-        share.price = qtd(trade.price)
+        share.last_price = qtd(trade.price)
 
         orderbook_features = self.orderbook_preprocessor.transform([getattr(share, column) for column in self.cfg.data.raw_data_orderbook_columns])
-        data_point = list(map(float, [int(time.time())] + [getattr(share, column) for column in self.cfg.data.raw_data_trades_columns] + orderbook_features))
+        data_point = list(map(float, [getattr(share, column) for column in self.cfg.data.raw_data_trades_columns] + orderbook_features))
         share.append(data_point)
         self.notify({trade.figi: data_point})  # Notify listeners with new data
         share.reset_data()
@@ -164,17 +184,26 @@ class DataCollector(Subject):
                 await asyncio.sleep(delay)
 
         async with AsyncClient(self.cfg.tokens.TOKEN) as client:
-            async for marketdata in client.market_data_stream.market_data_stream(request_iterator()):
-                if marketdata.trade is not None:
-                    share: DataBuffer = self.shares_dict[marketdata.trade.figi]
+            while True:
+                try:
+                    async for marketdata in client.market_data_stream.market_data_stream(request_iterator()):
+                        if marketdata.trade is not None:
+                            share: DataBuffer = self.shares_dict[marketdata.trade.figi]
 
-                    self._update_share_data_trade(share, marketdata.trade)
-                    if time.time() - share.last_write_time > self.single_data_write_delay: 
-                        self.make_datapoint(share, marketdata.trade)
+                            self._update_share_data_trade(share, marketdata.trade)
+                            if time.time() - share.last_write_time > self.single_data_write_delay: 
+                                self.make_datapoint(share, marketdata.trade)
 
-                if marketdata.orderbook is not None:
-                    share = self.shares_dict[marketdata.orderbook.figi]
-                    self._update_share_data_orderbook(share, marketdata.orderbook)
+                        if marketdata.orderbook is not None:
+                            share = self.shares_dict[marketdata.orderbook.figi]
+                            self._update_share_data_orderbook(share, marketdata.orderbook)
+
+                except AioRequestError as e:
+                    metadata = e.metadata
+                    ratelimit_reset = int(metadata.ratelimit_reset) + 1
+                    print(f"Rate limit exceeded. Waiting {ratelimit_reset:.2f} seconds...")
+                    await asyncio.sleep(ratelimit_reset)
+                
 
     async def run(self):
         await self.collect()

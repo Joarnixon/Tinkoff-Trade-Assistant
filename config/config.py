@@ -47,17 +47,18 @@ def update_files(cfg: DictConfig) -> None:
     Retrieves all available shares from the Tinkoff Invest API and updates the shares.yaml file.
     Creates new folders for storing the shares backlog files. All stored data will be reset.
     '''
-    update_shares(cfg)
-    update_backlog(cfg)
+    update_shares_yaml(cfg)
+    update_raw_data_folder(cfg)
+    update_processed_data_folder(cfg)
 
-def update_shares(cfg: DictConfig) -> None:
+def update_shares_yaml(cfg: DictConfig) -> None:
     """
     This function updates the shares.yaml file with the latest available shares from the Tinkoff Invest API.
     """
     with open(cfg.paths.shares_dict, 'w', encoding="utf-8") as file:
         yaml.safe_dump(get_all_shares(cfg.tokens.TOKEN), file, allow_unicode=True, default_flow_style=False)
 
-def update_backlog(cfg: DictConfig) -> None:
+def update_raw_data_folder(cfg: DictConfig) -> None:
     """
     This function updates the backlog of shares by creating empty folders for each share in the shares.yaml file
     and removing folders for delisted shares.
@@ -78,7 +79,7 @@ def update_backlog(cfg: DictConfig) -> None:
         # create csv
         
         file_path = os.path.join(folder_path, f'{cfg.data.raw_data_filename}.csv')
-        raw_data_orderbook_columns = [f"{column}_{proc}" for column in cfg.data.raw_data_orderbook_columns for proc in cfg.data.data_gather.orderbook_processes]
+        raw_data_orderbook_columns = [f"{column}_{proc}" for column in cfg.data.raw_data_orderbook_columns for proc in (cfg.data.data_gather.orderbook_processes + ['last'])]
         raw_data_columns = cfg.data.raw_data_trades_columns + raw_data_orderbook_columns
         with open(file_path, 'w') as f:
             f.write(','.join(raw_data_columns) + '\n')
@@ -86,6 +87,34 @@ def update_backlog(cfg: DictConfig) -> None:
     for figi in delisted_figis:
         folder_path = os.path.join(cfg.paths.raw_data, figi)
         os.rmdir(folder_path)
+
+def update_processed_data_folder(cfg: DictConfig) -> None:
+    with open(cfg.paths.shares_dict, 'r', encoding="utf-8") as file:
+        shares_dict = yaml.safe_load(file)
+
+    os.makedirs(cfg.paths.processed_data, exist_ok=True)
+    existing_folders = set(os.listdir(cfg.paths.processed_data))
+    valid_figis = set(shares_dict.keys())
+    delisted_figis = existing_folders.difference(valid_figis)
+
+    for figi in shares_dict:
+        folder_path = os.path.join(cfg.paths.processed_data, figi)
+        os.makedirs(folder_path, exist_ok=True)
+        
+        file_path = os.path.join(folder_path, f'{cfg.data.processed_data_filename}.csv')
+        with open(file_path, 'w') as f:
+            pass
+        labels_file_path = os.path.join(folder_path, f'{cfg.data.processed_data_labels_filename}.csv')
+        with open(labels_file_path, 'w') as f:
+            pass
+
+    # remove any delisted share
+    for figi in delisted_figis:
+        folder_path = os.path.join(cfg.paths.processed_data, figi)
+        os.rmdir(folder_path)
+
+
+
     
     
     

@@ -1,33 +1,46 @@
 import os
 import json
 import ast
+from torch.nn import Module
+import joblib
+from torch import save
 from polars import read_csv, DataFrame
-from typing import Union
+from typing import Union, Optional
 from datetime import datetime, timedelta
 import hydra
+from numpy import array
 from omegaconf import DictConfig
 
-class NullDataManager():
-    def __init__(self) -> None:
+class NullDataManager:
+    def __init__(self, cfg: DictConfig = None) -> None:
         pass
 
-    def write_share(self, figi, content, mode='a') -> None:
+    def write_share(self, figi: str, content: DataFrame) -> None:
         pass
 
-    def write_trend(self, content, mode='a') -> None:
+    def write_processed_share(self, figi: str, content: DataFrame) -> None:
         pass
 
-    def write_alerts(self, content, mode='a') -> None:
+    def write_trend(self, content: DataFrame) -> None:
         pass
 
+    def write_alerts(self, content: DataFrame) -> None:
+        pass
+
+    def write_selected_features(self, content: list[str]) -> None:
+        pass
+
+    def save_model(self, model) -> None:
+        pass
+        
 class DataManager:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-        share_columns_count = len(self.cfg.data.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * len(self.cfg.data.data_gather.orderbook_processes)
+        share_columns_count = len(self.cfg.data.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * (len(self.cfg.data.data_gather.orderbook_processes) + 1)
         self.share_schema = [f"{i}" for i in range(share_columns_count)] # will be discarded anyway
 
-    def _write_mean_volume_log(self, mean_volume):
+    def _write_mean_volume_log(self, mean_volume: dict):
         current_time = datetime.now()
         log_data = {
             "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -106,6 +119,39 @@ class DataManager:
                 dataframe = content
             dataframe.write_csv(f, include_header=False)
 
+    def write_processed_share(self, figi: str, content: DataFrame, labels: Optional[array]=None) -> None:
+        file_path = os.path.join(self.cfg.paths.processed_data, figi, f'{self.cfg.data.processed_data_filename}.csv')
+        
+        if os.path.getsize(file_path) == 0:
+            with open(file_path, mode='w') as f:
+                content.write_csv(f, include_header=True)
+            return
+
+        with open(file_path, 'r') as f:
+            first_line = f.readline().strip()
+
+        file_header = first_line.split(',')
+        df_columns = content.columns
+
+        if file_header != df_columns:
+            with open(file_path, mode='w') as f:
+                content.write_csv(f, include_header=True)
+        else:
+            with open(file_path, mode='a') as f:
+                content.write_csv(f, include_header=False)
+        
+        if labels is not None:
+            labels_content = DataFrame(labels, schema=['label'])
+            labels_file_path = os.path.join(self.cfg.paths.processed_data, figi, f'{self.cfg.data.processed_data_labels_filename}.csv')
+        
+            if os.path.getsize(labels_file_path) == 0:
+                with open(file_path, mode='w') as f:
+                    labels_content.write_csv(f, include_header=True)
+                return            
+            with open(labels_file_path, mode='a') as f:
+                labels_content.write_csv(f, include_header=False)
+
+
     def clear_share(self, figi: str):
         file_path = os.path.join(self.cfg.paths.raw_data, figi, f'{self.cfg.data.raw_data_filename}.csv')
         raw_data_orderbook_columns = [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in self.cfg.data.data_gather.orderbook_processes]
@@ -113,13 +159,39 @@ class DataManager:
         with open(file_path, 'w') as f:
             f.write(','.join(raw_data_columns) + '\n')
 
-    def write_trend(self, content, mode='a') -> None:
+    def write_trend(self, content: DataFrame) -> None:
         file_exists = os.path.isfile(self.cfg.paths.trend_data)
         
         if not file_exists:
             with open(self.cfg.paths.trend_data, mode='w') as f:
                 f.write(','.join(self.cfg.data.trend_data_columns) + '\n')
 
-        with open(self.cfg.paths.trend_data, mode=mode) as f:
+        with open(self.cfg.paths.trend_data, mode='a') as f:
             dataframe = DataFrame(content, schema=self.cfg.data.trend_data_columns)
             dataframe.write_csv(f, include_header=False)
+    
+    def write_selected_features(self, content: list[str], figi: Optional[str]) -> None:
+        file_exists = os.path.isfile(self.cfg.paths.selected_features)
+
+        if not file_exists:
+            with open(self.cfg.paths.selected_features, mode='w') as f:
+                json.dump({figi: content}, f)
+        else:
+            with open(self.cfg.paths.selected_features, mode='r') as f:
+                selected_features_dict = json.load(f)
+
+            selected_features_dict[figi] = content
+
+            with open(self.cfg.paths.selected_features, mode='w') as f:
+                json.dump(selected_features_dict, f)
+    
+    def save_model(self, model, figi):
+        model_type = model.__class__.__name__
+        model_path = os.path.join(self.cfg.paths.models, f"{figi}_{model_type}")
+
+        if isinstance(model, Module):
+            # Save PyTorch model
+            save(model.state_dict(), f"{model_path}.pth")
+        else:
+            # Save scikit-learn model
+            joblib.dump(model, f"{model_path}.joblib")

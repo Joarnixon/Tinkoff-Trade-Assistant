@@ -1,19 +1,23 @@
 paths:
-  project: ${hydra.runtime.cwd}
+  project: ${hydra:runtime.cwd}
   raw_data: ${.project}\data\raw
   models: ${.project}\models
   shares_dict: ${.project}\config\shares.yaml
   mean_volume_log: ${.project}\data\mean_volumes.json
   alerts: ${.project}\data\alerts.json
   trend_data: ${.project}\data\trend.csv
+  selected_features: ${.project}\data\selected_features.json
+  processed_data: ${.project}\data\processed
 
 tokens:
-  TOKEN: 
-  TOKEN_SANDBOX: 
+  TOKEN:
+  TOKEN_SANDBOX:
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
   raw_data_filename: market_log
+  processed_data_filename: dataset
+  processed_data_labels_filename: labels
   raw_data_trades_columns:
     - time
     - buyers_count
@@ -36,9 +40,9 @@ data:
   data_labeling:
     time_column_name: time # modify this too if you modified any of the columns above
     price_column_name: price_last
-    percent_change_threshold: 0.5
-    min_time_interval: 15
-    max_time_interval: 300
+    percent_change_threshold: 0.4
+    min_time_interval: 200
+    max_time_interval: 600
     label_meaning:
       1: Buy
       0: Hold
@@ -54,7 +58,7 @@ data:
   data_gather:
     buffer_write_delay: 500
     orderbook_depth: 10
-    single_data_write_delay: 35
+    single_data_write_delay: 37
     request_delay: 5
     orderbook_processes:
       - min
@@ -72,4 +76,5 @@ volume_scan:
     bigger_by_factor: 1
 
 random_state: 424242
+test_size: 0.3
 

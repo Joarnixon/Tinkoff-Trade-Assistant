@@ -1,6 +1,9 @@
 import polars as pl
 import numpy as np
+from numpy import array
 from numba import njit
+from typing import Optional
+from src.data.data_manager import DataManager, NullDataManager
 
 class DataLabeler:
     def __init__(self, cfg):
@@ -16,7 +19,6 @@ class DataLabeler:
     def _calculate_price_changes(time_array, price_array, percent_change_threshold, min_time_interval, max_time_interval):
         labels = np.full(len(time_array), np.nan)
         n = len(time_array)
-        
         for i in range(n):
             start_time = time_array[i]
             start_price = price_array[i]
@@ -35,10 +37,10 @@ class DataLabeler:
                     break
                 elif time_diff > 300:
                     break
-        
         return labels
 
-    def label_dataset(self, dataset):
+    def fit(self, dataset) -> array:
+        """Make labels from the dataset. Size of the dataset would change."""
         time_array = dataset[self.time_column].to_numpy()
         price_array = dataset[self.price_column].to_numpy()
         
