@@ -12,7 +12,7 @@ class DataLabeler:
         self.price_column = cfg.data.data_labeling.price_column_name
         self.min_time_interval = int(cfg.data.data_labeling.min_time_interval)
         self.max_time_interval = int(cfg.data.data_labeling.max_time_interval)
-        self.label_meaning = cfg.data.data_labeling.label_meaning
+        self.label_meaning = dict(cfg.data.data_labeling.label_meaning)
 
     @staticmethod
     @njit
@@ -33,7 +33,7 @@ class DataLabeler:
                     elif -percent_change_threshold <= percent_change <= percent_change_threshold:
                         labels[i] = 0
                     else:
-                        labels[i] = -1
+                        labels[i] = 2
                     break
                 elif time_diff > 300:
                     break

@@ -1,4 +1,4 @@
 _target_: src.model.baseline.LinearModel
 args:
-  class_weight: 'balanced'
   max_iter: 10000
+  random_state: 42

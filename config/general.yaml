@@ -40,13 +40,13 @@ data:
   data_labeling:
     time_column_name: time # modify this too if you modified any of the columns above
     price_column_name: price_last
-    percent_change_threshold: 0.4
-    min_time_interval: 200
-    max_time_interval: 600
+    percent_change_threshold: 0.2
+    min_time_interval: 90
+    max_time_interval: 300
     label_meaning:
-      1: Buy
-      0: Hold
-      -1: Sell
+      hold: 0
+      buy: 1
+      sell: 2
 
   mean_volume:
     update_interval_days: 2
@@ -75,6 +75,6 @@ volume_scan:
     price_change_threshold: 0.2
     bigger_by_factor: 1
 
-random_state: 424242
+random_state: 125556
 test_size: 0.3
 

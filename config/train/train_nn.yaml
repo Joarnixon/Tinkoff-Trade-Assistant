@@ -1,0 +1,14 @@
+random_state: 4242
+test_size: 0.3
+shuffle: True
+stratify: True
+device: 'cpu'
+batch_size: 2
+num_epochs: 20
+early_stopping_patience: 10
+
+optimizer:
+  name: 'Adam'
+  params:
+    lr: 0.0001
+    weight_decay: 0.0001

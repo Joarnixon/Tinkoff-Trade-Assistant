@@ -51,7 +51,7 @@ class SelectFeatures:
     def _lasso_selection(self, X, y):
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
-        lasso = Lasso(random_state=42, alpha=5000, positive=True, fit_intercept=False, max_iter=1000)
+        lasso = Lasso(random_state=self.random_state, alpha=5000, positive=True, fit_intercept=False, max_iter=1000)
         lasso.fit(X_scaled, y)
         if not all(lasso.coef_ == 0):
             return lasso.coef_ / np.sum(lasso.coef_)
@@ -59,6 +59,7 @@ class SelectFeatures:
     
     def compare_with_random_noise(self, X, y):
         n_samples = X.shape[0]
+        np.random.seed(self.random_state)
         random_feature1 = np.random.normal(0, 1, n_samples)
         random_feature2 = np.random.normal(5, 2, n_samples)
         random_feature3 = np.random.normal(10, 10, n_samples)
@@ -79,7 +80,7 @@ class SelectFeatures:
         
         less_important_indices = np.where(importances[:-3] < dummy_importance)[0]
         
-        less_important_features = np.array(X.columns)[less_important_indices]
+        # less_important_features = np.array(X.columns)[less_important_indices]
         
         # print("Features less important than random noise:")
         # for feature in less_important_features:

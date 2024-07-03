@@ -119,9 +119,8 @@ class DataManager:
                 dataframe = content
             dataframe.write_csv(f, include_header=False)
 
-    def write_processed_share(self, figi: str, content: DataFrame, labels: Optional[array]=None) -> None:
+    def write_processed_share(self, figi: str, content: DataFrame) -> None:
         file_path = os.path.join(self.cfg.paths.processed_data, figi, f'{self.cfg.data.processed_data_filename}.csv')
-        
         if os.path.getsize(file_path) == 0:
             with open(file_path, mode='w') as f:
                 content.write_csv(f, include_header=True)
@@ -140,16 +139,16 @@ class DataManager:
             with open(file_path, mode='a') as f:
                 content.write_csv(f, include_header=False)
         
-        if labels is not None:
-            labels_content = DataFrame(labels, schema=['label'])
-            labels_file_path = os.path.join(self.cfg.paths.processed_data, figi, f'{self.cfg.data.processed_data_labels_filename}.csv')
-        
-            if os.path.getsize(labels_file_path) == 0:
-                with open(file_path, mode='w') as f:
-                    labels_content.write_csv(f, include_header=True)
-                return            
-            with open(labels_file_path, mode='a') as f:
-                labels_content.write_csv(f, include_header=False)
+    def write_processed_share_labels(self, figi: str, labels: array) -> None:
+        labels_content = DataFrame(labels, schema=['label'])
+        labels_file_path = os.path.join(self.cfg.paths.processed_data, figi, f'{self.cfg.data.processed_data_labels_filename}.csv')
+    
+        if os.path.getsize(labels_file_path) == 0:
+            with open(labels_file_path, mode='w') as f:
+                labels_content.write_csv(f, include_header=True)
+            return            
+        with open(labels_file_path, mode='a') as f:
+            labels_content.write_csv(f, include_header=False)
 
 
     def clear_share(self, figi: str):

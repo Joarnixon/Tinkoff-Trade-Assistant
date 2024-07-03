@@ -9,6 +9,7 @@ import logging
 
 
 
+
 logger = logging.getLogger("tinkoff.invest.logging")
 logger.setLevel(logging.INFO)
 
@@ -20,11 +21,13 @@ def main(cfg: DictConfig) -> None:
     figi = 'TCS00A106YF0'
     dm = DataManager(cfg)
     sh = dm.load_share(figi)
-    model_cfg = OmegaConf.load('config/models/logistic_regression.yaml')
-    model = instantiate(model_cfg)
+
     dp = DataPipelineFactory.create_offline_pipeline(cfg)
-    tp = TrainPipelineFactory.create_ml_pipeline(cfg=cfg, model=model, logger=logger, data_manager=dm)
     sh = dp.transform(sh)
-    model, _, _ = tp.train(sh, figi)
+
+    model_cfg = OmegaConf.load('config/models/logistic_regression.yaml')
+    train_cfg = OmegaConf.load('config/train/train_ml.yaml')
+    tp = TrainPipelineFactory.create_ml_pipeline(cfg, model_cfg, train_cfg, None, logger, dm)
+    model, _, _ , _= tp.train(sh, figi)
 
 main()
