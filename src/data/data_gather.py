@@ -1,6 +1,6 @@
 import asyncio
 from numpy import nan
-from .observer import Observer 
+from .subject import Subject
 from .data_manager import DataManager, NullDataManager
 from .data_preprocess import OrderBookPreprocessor
 from typing import Optional, Union
@@ -40,20 +40,6 @@ class Data:
     @property
     def time(self):
         return int(time.time())
-
-class Subject:
-    def __init__(self):
-        self._observers: list[Observer] = []
-
-    def attach(self, observer: Observer):
-        self._observers.append(observer)
-
-    def remove(self, observer: Observer):
-        self._observers.remove(observer)
-
-    def notify(self, data: dict):
-        for observer in self._observers:
-            observer.update(data)
 
 class DataBuffer(Data):
     """
@@ -121,9 +107,9 @@ class DataCollector(Subject):
         self.single_data_write_delay = cfg.data.data_gather.single_data_write_delay
 
         # set initial price
-        with Client(cfg.tokens.TOKEN) as client:
-            for share in list(self.shares_dict.values()):
-                share.last_price = qtd(client.market_data.get_last_prices(figi=[share.figi]).last_prices[0].price)
+        # with Client(cfg.tokens.TOKEN) as client:
+        #     for share in list(self.shares_dict.values()):
+        #         share.last_price = qtd(client.market_data.get_last_prices(figi=[share.figi]).last_prices[0].price)
 
     # Modify this to take more data if you know how. Change columns in config
     @staticmethod
@@ -161,7 +147,7 @@ class DataCollector(Subject):
         orderbook_features = self.orderbook_preprocessor.transform([getattr(share, column) for column in self.cfg.data.raw_data_orderbook_columns])
         data_point = list(map(float, [getattr(share, column) for column in self.cfg.data.raw_data_trades_columns] + orderbook_features))
         share.append(data_point)
-        self.notify({trade.figi: data_point})  # Notify listeners with new data
+        self.notify({trade.figi: [data_point]})  # Notify listeners with new data
         share.reset_data()
         share.last_write_time = time.time()
 

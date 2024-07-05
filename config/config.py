@@ -1,6 +1,7 @@
 from tinkoff.invest import Client, Share
 from typing import Optional
 import hydra
+import shutil
 from omegaconf import DictConfig
 import yaml
 import os
@@ -86,7 +87,8 @@ def update_raw_data_folder(cfg: DictConfig) -> None:
     # remove any delisted share
     for figi in delisted_figis:
         folder_path = os.path.join(cfg.paths.raw_data, figi)
-        os.rmdir(folder_path)
+        shutil.rmtree(folder_path)
+
 
 def update_processed_data_folder(cfg: DictConfig) -> None:
     with open(cfg.paths.shares_dict, 'r', encoding="utf-8") as file:
@@ -111,7 +113,29 @@ def update_processed_data_folder(cfg: DictConfig) -> None:
     # remove any delisted share
     for figi in delisted_figis:
         folder_path = os.path.join(cfg.paths.processed_data, figi)
-        os.rmdir(folder_path)
+        shutil.rmtree(folder_path)
+
+    
+def update_models_folder(cfg: DictConfig) -> None:
+    """
+    This function updates the models folder by creating folders for each FIGI in the models_dict
+    and removing folders for delisted or removed models.
+    """
+    with open(cfg.paths.shares_dict, 'r', encoding="utf-8") as file:
+        shares_dict = yaml.safe_load(file)
+        
+    os.makedirs(cfg.paths.models, exist_ok=True)
+    existing_folders = set(os.listdir(cfg.paths.models))
+    valid_figis = set(shares_dict.keys())
+    delisted_figis = existing_folders.difference(valid_figis)
+
+    for figi in valid_figis:
+        folder_path = os.path.join(cfg.paths.models, figi)
+        os.makedirs(folder_path, exist_ok=True)
+    print(valid_figis, delisted_figis)
+    for figi in delisted_figis:
+        folder_path = os.path.join(cfg.paths.models, figi)
+        shutil.rmtree(folder_path)
 
 
 

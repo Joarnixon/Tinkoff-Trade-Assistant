@@ -6,22 +6,22 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from polars import DataFrame
 from copy import deepcopy
-from numpy import array
+from numpy import array, argmax
 
-def train_nn(model: nn.Module, data: DataFrame, labels: array, validate_func: callable, logger, monitor, cfg):
+def train_nn(model: nn.Module, dataset: DataFrame, labels: array, validate_func: callable, logger, monitor: SummaryWriter, cfg):
     device = torch.device(cfg.device)
     
     data_train, data_val, labels_train, labels_val = train_test_split(
-        data, labels, 
+        dataset, labels, 
         test_size=cfg.test_size, 
         random_state=cfg.random_state, 
         shuffle=cfg.shuffle, 
         stratify=labels if cfg.stratify else None
     )
     torch.manual_seed(cfg.random_state)
-    train_dataset = TensorDataset(torch.tensor(data_train.to_numpy(), dtype=torch.float32), 
+    train_dataset = TensorDataset(torch.tensor(data_train.drop('time').to_numpy(), dtype=torch.float32), 
                                   torch.tensor(labels_train, dtype=torch.long))
-    val_dataset = TensorDataset(torch.tensor(data_val.to_numpy(), dtype=torch.float32), 
+    val_dataset = TensorDataset(torch.tensor(data_val.drop('time').to_numpy(), dtype=torch.float32), 
                                 torch.tensor(labels_val, dtype=torch.long))
 
     train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
@@ -34,7 +34,6 @@ def train_nn(model: nn.Module, data: DataFrame, labels: array, validate_func: ca
     best_val_loss = float('inf')
     early_stopping_counter = 0
     logs = []
-
     for epoch in range(cfg.num_epochs):
         model.train()
         train_loss = 0.0
@@ -53,9 +52,22 @@ def train_nn(model: nn.Module, data: DataFrame, labels: array, validate_func: ca
         val_loss, val_metrics = validate_func(model, val_loader, criterion, device)
         
         logger.info(f"Epoch {epoch+1}/{cfg.num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
-
+        
         if monitor:
-            monitor.log_metrics(logs[-1])
+            monitor.add_scalar('Train loss', train_loss, epoch+1)
+            monitor.add_scalar('Val loss', val_loss, epoch+1)
+            monitor.add_scalar('Val accuracy', val_metrics['accuracy'], epoch+1)
+
+            monitor.add_hparams({'batch_size': cfg.batch_size,
+                                'lr': cfg.optimizer.params.lr,
+                                'weight_decay': cfg.optimizer.params.weight_decay,
+                                'stratification': cfg.stratify},
+                                {'accuracy': val_metrics['accuracy']},
+                                 global_step=epoch+1,
+                                 run_name='default'
+                                 )
+            with torch.no_grad():
+                monitor.add_embedding(data_train.to_numpy(), metadata=torch.argmax(model(torch.tensor(data_train.drop('time').to_numpy(), dtype=torch.float32, device=device))[1], dim=1), global_step=epoch+1)
 
         # Early stopping
         if val_loss < best_val_loss:
@@ -68,7 +80,8 @@ def train_nn(model: nn.Module, data: DataFrame, labels: array, validate_func: ca
                 logger.info(f"Early stopping triggered after {epoch+1} epochs")
                 break
     
-    val_loss, validation_metrics = validate_func(model, val_loader, criterion, device)
-    return best_model, logs, validation_metrics, (data_val, labels_val)
+    val_loss, validation_metrics, probas = validate_func(best_model, val_loader, criterion, device, return_data=True)
+
+    return best_model, logs, validation_metrics, (data_val, labels_val, argmax(probas, axis=1), probas)
 
 

@@ -19,12 +19,14 @@ class SelectFeatures:
         else:
             self.preselected_features = {}
 
-    def fit(self, X, y, figi: Optional[str] = None):
+    def fit_transform(self, X, y, figi: Optional[str] = None):
         """
         Selects the most important features based on two criteria:
         1. Random Forest feature importance
         2. Random noise importance comparison
         """
+        time_column = X.select(['time']).to_series()
+        X = X.drop(['time'])
         custom_features = self.compare_with_random_noise(X, y)
         k = len(custom_features)
         rf_features = self._random_forest_selection(X, y, k)
@@ -36,9 +38,9 @@ class SelectFeatures:
         X_selected = X.select(columns_to_keep)
 
         self.data_manager.write_selected_features(columns_to_keep, figi)
-        return X_selected
+        return X_selected.insert_column(0, time_column)
     
-    def fit_online(self, X: pl.DataFrame, figi: Optional[str] = None):
+    def fit_transform_online(self, X: pl.DataFrame, figi: Optional[str] = None):
         return X.select(self.preselected_features[figi])
 
     def _random_forest_selection(self, X, y, k):

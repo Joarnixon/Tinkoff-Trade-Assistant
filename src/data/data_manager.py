@@ -27,7 +27,7 @@ class NullDataManager:
     def write_alerts(self, content: DataFrame) -> None:
         pass
 
-    def write_selected_features(self, content: list[str]) -> None:
+    def write_selected_features(self, content: list[str], figi: str) -> None:
         pass
 
     def save_model(self, model) -> None:
@@ -36,9 +36,7 @@ class NullDataManager:
 class DataManager:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
-
-        share_columns_count = len(self.cfg.data.raw_data_trades_columns) + len(self.cfg.data.raw_data_orderbook_columns) * (len(self.cfg.data.data_gather.orderbook_processes) + 1)
-        self.share_schema = [f"{i}" for i in range(share_columns_count)] # will be discarded anyway
+        self.share_schema = self.cfg.data.raw_data_trades_columns + [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in (self.cfg.data.data_gather.orderbook_processes + ['last']) ]
 
     def _write_mean_volume_log(self, mean_volume: dict):
         current_time = datetime.now()
@@ -153,7 +151,7 @@ class DataManager:
 
     def clear_share(self, figi: str):
         file_path = os.path.join(self.cfg.paths.raw_data, figi, f'{self.cfg.data.raw_data_filename}.csv')
-        raw_data_orderbook_columns = [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in self.cfg.data.data_gather.orderbook_processes]
+        raw_data_orderbook_columns = [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in (self.cfg.data.data_gather.orderbook_processes + ['last'])]
         raw_data_columns = self.cfg.data.raw_data_trades_columns + raw_data_orderbook_columns
         with open(file_path, 'w') as f:
             f.write(','.join(raw_data_columns) + '\n')
@@ -184,13 +182,19 @@ class DataManager:
             with open(self.cfg.paths.selected_features, mode='w') as f:
                 json.dump(selected_features_dict, f)
     
-    def save_model(self, model, figi):
+    def save_model(self, model, figi, save_best=False):
         model_type = model.__class__.__name__
-        model_path = os.path.join(self.cfg.paths.models, f"{figi}_{model_type}")
+        model_path = os.path.join(self.cfg.paths.models, figi)
 
         if isinstance(model, Module):
             # Save PyTorch model
-            save(model.state_dict(), f"{model_path}.pth")
+            checkpoint = {'model': model, 'state_dict': model.state_dict()}
+            if not save_best:
+                save(checkpoint, f"{model_path}/{model_type}.pth")
+            else:
+                save(checkpoint, f"{model_path}/best.pth")
         else:
-            # Save scikit-learn model
-            joblib.dump(model, f"{model_path}.joblib")
+            if not save_best:
+                joblib.dump(model, f"{model_path}/{model_type}.joblib")
+            else:
+                joblib.dump(model, f"{model_path}/best.joblib")

@@ -11,7 +11,7 @@ paths:
 
 tokens:
   TOKEN:
-  TOKEN_SANDBOX:
+  TOKEN_SANDBOX: 
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
@@ -75,6 +75,6 @@ volume_scan:
     price_change_threshold: 0.2
     bigger_by_factor: 1
 
-random_state: 125556
+random_state: 1255141
 test_size: 0.3
 
