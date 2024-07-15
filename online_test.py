@@ -5,13 +5,6 @@ from src.data.data_manager import DataManager
 import logging
 import asyncio
 
-class Observer:
-    def update(self, data: dict):
-        pass
-
-test_observer = Observer()
-
-
 logger = logging.getLogger("tinkoff.invest.logging")
 logger.setLevel(logging.INFO)
 
@@ -25,7 +18,6 @@ def main(cfg):
     op = OnlinePredictions(cfg, figi)
     
     dc.attach(op)
-    op.attach(test_observer)
 
     async def run_tasks():
         await asyncio.gather(

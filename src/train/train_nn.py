@@ -56,18 +56,15 @@ def train_nn(model: nn.Module, dataset: DataFrame, labels: array, validate_func:
         if monitor:
             monitor.add_scalar('Train loss', train_loss, epoch+1)
             monitor.add_scalar('Val loss', val_loss, epoch+1)
-            monitor.add_scalar('Val accuracy', val_metrics['accuracy'], epoch+1)
 
             monitor.add_hparams({'batch_size': cfg.batch_size,
                                 'lr': cfg.optimizer.params.lr,
                                 'weight_decay': cfg.optimizer.params.weight_decay,
                                 'stratification': cfg.stratify},
                                 {'accuracy': val_metrics['accuracy']},
-                                 global_step=epoch+1,
-                                 run_name='default'
-                                 )
-            with torch.no_grad():
-                monitor.add_embedding(data_train.to_numpy(), metadata=torch.argmax(model(torch.tensor(data_train.drop('time').to_numpy(), dtype=torch.float32, device=device))[1], dim=1), global_step=epoch+1)
+                                run_name='runs/hparams',
+                                global_step=epoch+1,
+                                )
 
         # Early stopping
         if val_loss < best_val_loss:

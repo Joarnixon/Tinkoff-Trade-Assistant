@@ -80,8 +80,7 @@ class OnlinePredictions(Subject):
             if not self.prediction_queue.empty():
                 batch = self.prediction_queue.get()
                 predictions = await self._predict_batch(batch)
-                print(f"Predictions: {predictions}")
-                self.notify_observers(predictions)
+                self.notify(predictions)
 
     async def _predict_batch(self, batch: List[tuple]):
         predictions = {}
@@ -96,9 +95,6 @@ class OnlinePredictions(Subject):
         
         return predictions
 
-    def _predict_single(self, model, features):
-        return (features, model.predict(np.array([features])))
-
-    def notify_observers(self, predictions):
-        for observer in self._observers:
-            observer.update(predictions)
+    def _predict_single(self, model, features: DataFrame):
+        prediction, proba = model.predict(np.array([features]))
+        return {'result': prediction.tolist(), 'probability': proba.tolist()}

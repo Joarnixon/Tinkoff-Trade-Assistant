@@ -20,14 +20,9 @@ def main(cfg: DictConfig) -> None:
     update_processed_data_folder(cfg)
     figi = 'TCS00A106YF0'
     dm = DataManager(cfg)
-    sh = dm.load_share(figi)
-
-    dp = DataPipelineFactory.create_offline_pipeline(cfg)
-    sh = dp.transform(sh)
-
     model_cfg = OmegaConf.load('config/models/linear_nn.yaml')
     train_cfg = OmegaConf.load('config/train/train_nn.yaml')
-    tp = TrainPipelineFactory.create_nn_pipeline(cfg, model_cfg, train_cfg, None, logger, None, dm)
-    model, _, _ , _= tp.train(sh, figi, show_validation=True, save_best=True)
+    tp = TrainPipelineFactory.create_nn_pipeline(cfg, model_cfg, train_cfg, None, figi, logger, None, dm)
+    model, _, _ , _= tp.train(show_validation=True, save_best=True)
 
 main()

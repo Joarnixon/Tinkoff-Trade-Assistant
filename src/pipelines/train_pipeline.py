@@ -1,5 +1,6 @@
 from src.data.data_manager import DataManager, NullDataManager
 from src.data.data_labeling import DataLabeler
+from src.pipelines.data_pipeline import DataPipelineFactory
 from src.features.feature_selection import SelectFeatures
 from src.train import train_ml, train_nn
 from src.validate import val_ml, val_nn
@@ -13,22 +14,33 @@ from hydra.utils import instantiate
 import polars as pl
 
 class TrainPipeline:
-    def __init__(self, model: Model, train_func: callable, validate_func: callable, data_manager: Union[DataManager, NullDataManager], cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, logger, monitor):
+    """
+    Used to train the model for the specific figi.
+    To train the same model for multiple figi provide figi in train arg.
+    If model is none will instantiate the model from config files.
+    """
+    def __init__(self, model: Model, figi: str, train_func: callable, validate_func: callable, data_manager: Union[DataManager, NullDataManager], cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, logger, monitor):
         self.model = model
         self.train_func = train_func
         self.validate_func = validate_func
         self.data_manager = data_manager
         self.logger = logger
-        self.monitor = monitor
         self.select_features = train_cfg.select_features
         self.feature_selection = SelectFeatures(cfg, data_manager)
         self.data_labeler = DataLabeler(cfg)
+        self.data_pipeline = DataPipelineFactory.create_offline_pipeline(cfg)
 
         self.model_cfg = model_cfg
         self.train_cfg = train_cfg
 
-    def train(self, data: pl.DataFrame, figi: str, show_validation=False, save_best=False):
-        data, labels = self.data_labeler.fit(data)
+        self.figi = figi
+        self.monitor = monitor if monitor is not None else SummaryWriter(f'runs/{figi}')
+
+
+    def prepare_data(self, figi):
+        share = self.data_manager.load_share(figi)
+        share = self.data_pipeline.transform(share)
+        data, labels = self.data_labeler.fit(share)
         self.logger.info(f'Data shape: {data.shape}, '
                         f'Buy labels count: {len(labels[labels==self.data_labeler.label_meaning["buy"]])}, '
                         f'Sell labels count: {len(labels[labels==self.data_labeler.label_meaning["sell"]])}'
@@ -37,8 +49,14 @@ class TrainPipeline:
             data = self.feature_selection.fit_transform(data, labels, figi)
         self.logger.info(f'Data shape after feature selection: {data.shape}')
         self.logger.info(f'Data has colummns: {data.columns}')
-        self.data_manager.write_processed_share(figi, data)
-        self.data_manager.write_processed_share_labels(figi, labels)
+        self.data_manager.write_processed_share(self.figi, data)
+        self.data_manager.write_processed_share_labels(self.figi, labels)
+        return data, labels
+
+    def train(self, show_validation=False, save_best=False, figi=None):
+        if figi is None:
+            figi = self.figi
+        data, labels = self.prepare_data(figi)
         
         if self.model is None:
             if hasattr(self.model_cfg, 'hidden_layers'):
@@ -60,9 +78,10 @@ class TrainPipeline:
 
 class TrainPipelineFactory:
     @staticmethod
-    def create_ml_pipeline(cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, model: Optional[Model], logger, monitor=None, data_manager: Optional[DataManager] = None) -> TrainPipeline:
+    def create_ml_pipeline(cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, model: Optional[Model], figi, logger, monitor=None, data_manager: Optional[DataManager] = None) -> TrainPipeline:
         return TrainPipeline(
             model,
+            figi,
             train_ml,
             val_ml,
             data_manager if data_manager is not None else NullDataManager(),
@@ -75,9 +94,10 @@ class TrainPipelineFactory:
         
 
     @staticmethod
-    def create_nn_pipeline(cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, model: Optional[Model], logger, monitor=None, data_manager: Optional[DataManager] = None) -> TrainPipeline:
+    def create_nn_pipeline(cfg: DictConfig, model_cfg: DictConfig, train_cfg: DictConfig, model: Optional[Model], figi: str, logger, monitor=None, data_manager: Optional[DataManager] = None) -> TrainPipeline:
         return TrainPipeline(
             model,
+            figi,
             train_nn,
             val_nn,
             data_manager if data_manager is not None else NullDataManager(),
@@ -85,5 +105,5 @@ class TrainPipelineFactory:
             model_cfg,
             train_cfg,
             logger,    
-            monitor if monitor is not None else SummaryWriter('runs/default')       
+            monitor 
         )
