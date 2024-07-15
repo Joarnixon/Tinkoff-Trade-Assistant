@@ -51,6 +51,7 @@ def update_files(cfg: DictConfig) -> None:
     update_shares_yaml(cfg)
     update_raw_data_folder(cfg)
     update_processed_data_folder(cfg)
+    update_models_folder(cfg)
 
 def update_shares_yaml(cfg: DictConfig) -> None:
     """
