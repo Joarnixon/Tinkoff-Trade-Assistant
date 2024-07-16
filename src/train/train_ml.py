@@ -11,9 +11,9 @@ def train_ml(model, data, labels, validate_func, logger, monitor, cfg):
         stratify=labels if cfg.stratify else None)
     
     start_time = int(time.time())
-    model.fit(data_train.drop('time'), labels_train)
+    model.fit(data_train.drop('time').to_numpy(), labels_train)
     logger.info(f'Model trained in {int(time.time()) - start_time} seconds')
 
     validation_metrics, validation_data = validate_func(model, data_val, labels_val, logger)
 
-    return model, None, validation_metrics, validation_data
+    return model, validation_metrics['accuracy'], validation_metrics, validation_data

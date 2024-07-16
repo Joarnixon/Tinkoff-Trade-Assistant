@@ -18,11 +18,11 @@ logger.setLevel(logging.INFO)
 @hydra.main(version_base=None, config_path='D:/Tinkoff-Trade-Assistant/config', config_name='general.yaml')
 def main(cfg: DictConfig) -> None:
     update_processed_data_folder(cfg)
-    figi = 'TCS00A106YF0'
+    figi = 'BBG004RVFCY3'
     dm = DataManager(cfg)
     model_cfg = OmegaConf.load('config/models/linear_nn.yaml')
     train_cfg = OmegaConf.load('config/train/train_nn.yaml')
     tp = TrainPipelineFactory.create_nn_pipeline(cfg, model_cfg, train_cfg, None, figi, logger, None, dm)
-    model, _, _ , _= tp.train(show_validation=True, save_best=True)
+    model, _, _ , _= tp.train(show_validation=True)
 
 main()

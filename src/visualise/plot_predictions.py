@@ -34,6 +34,8 @@ def plot_predictions(df: pl.DataFrame, predicted_labels: np.array, predicted_pro
     # Create buy (label 1) and sell (label 2) traces
     buy_indices = np.where(predicted_labels == 1)[0]
     sell_indices = np.where(predicted_labels == 2)[0]
+
+    predicted_proba = np.array(predicted_proba)
     
     trace_buy = go.Scatter(
         x=time_array[buy_indices],

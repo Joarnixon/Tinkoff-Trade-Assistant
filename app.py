@@ -7,6 +7,7 @@ import random as rd
 from contextlib import asynccontextmanager
 from src.data import DataCollector
 from src.pipelines.online_pipeline import OnlinePredictions
+from src.evaluation.online_metric import OnlineMetric
 from src.data import DataManager
 from volume_scanner import VolumeScan
 from server.routers import chart, shares
@@ -18,36 +19,26 @@ from src.data.subject import Subject
 log = logging.getLogger("tinkoff.invest.logging")
 log.setLevel(logging.WARNING)
 
-class TestOnlinePredictions(Subject):
-    def __init__(self, cfg, figi):
-        super(TestOnlinePredictions, self).__init__()
-        self.cfg = cfg
-        self.figi = 'BBG004730N88'
-    
-    async def run(self):
-        while True:
-            await asyncio.sleep(40)
-            self.notify({self.figi: (rd.randint(0, 2), 1)})
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     hydra.initialize(version_base=None, config_path="config", job_name="test")
     cfg = hydra.compose(config_name="general.yaml", return_hydra_config=True)
-    figi = 'TCS00A106YF0'
-
     all_shares = OmegaConf.load(str(cfg.paths.shares_dict))
 
     dm = DataManager(cfg)
     dc = DataCollector(cfg)
-    op = TestOnlinePredictions(cfg, figi)
+    op = OnlinePredictions(cfg)
     vs = VolumeScan(cfg, dm)
+    om = OnlineMetric(cfg)
 
     connections = Connections(all_shares)
     app.state.connections = connections
     app.state.all_shares = all_shares
 
     dc.attach(op)
+    dc.attach(om)
     op.attach(connections)
+    op.attach(om)
 
     async def background_tasks():
         await asyncio.gather(dc.run(), op.run(), vs.run())
@@ -58,6 +49,7 @@ async def lifespan(app: FastAPI):
     
     yield
 
+    om.save()
     app.state.background_tasks.cancel()
 
 app = FastAPI(lifespan=lifespan)

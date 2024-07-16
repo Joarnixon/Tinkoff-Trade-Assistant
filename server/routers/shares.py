@@ -6,8 +6,12 @@ import os
 router = APIRouter(prefix="/shares")
 
 def model_available(figi: str, model_path) -> bool:
-    model_file = os.path.join(model_path, figi, "best.pth")
-    return True
+    model_folder = os.path.join(model_path, figi)
+    for filename in os.listdir(model_folder):
+        if filename.endswith((".pth", ".pkl", ".pickle", ".joblib")):
+            return True
+    return False
+
 
 @cache
 def get_trading_shares(request: Request):

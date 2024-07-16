@@ -25,17 +25,16 @@ class DataLabeler:
             
             for j in range(i + 1, n):
                 time_diff = time_array[j] - start_time
-                if min_time_interval <= time_diff <= max_time_interval:
-                    end_price = price_array[j]
-                    percent_change = (end_price - start_price) / start_price * 100
-                    if percent_change > percent_change_threshold:
-                        labels[i] = 1
-                    elif -percent_change_threshold <= percent_change <= percent_change_threshold:
-                        labels[i] = 0
-                    else:
-                        labels[i] = 2
+                if time_diff >= max_time_interval:
                     break
-                elif time_diff > 300:
+                end_price = price_array[j]
+                percent_change = (end_price - start_price) / start_price * 100
+            
+                if abs(percent_change) > percent_change_threshold:
+                    labels[i] = 1 if percent_change > 0 else 2
+                    break
+                elif time_diff >= min_time_interval:
+                    labels[i] = 0  # No significant change within min_time_interval
                     break
         return labels
 

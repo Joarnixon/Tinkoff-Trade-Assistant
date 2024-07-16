@@ -32,8 +32,18 @@ def train_nn(model: nn.Module, dataset: DataFrame, labels: array, validate_func:
     criterion = cross_entropy_loss
     best_model = deepcopy(model)
     best_val_loss = float('inf')
+    best_val_score = None
     early_stopping_counter = 0
-    logs = []
+    
+    if cfg.weights == 'balanced':
+        label_counts = torch.bincount(torch.tensor(labels, dtype=int))
+        total_samples = len(labels)
+        class_weights = total_samples / (label_counts * len(label_counts))
+    elif cfg.weights is None:
+        class_weights = torch.tensor([1, 1, 1])
+    else:
+        class_weights = torch.tensor(cfg.weights)
+
     for epoch in range(cfg.num_epochs):
         model.train()
         train_loss = 0.0
@@ -42,33 +52,26 @@ def train_nn(model: nn.Module, dataset: DataFrame, labels: array, validate_func:
             data, label = data.to(device), label.to(device).squeeze(-1)
             optimizer.zero_grad()
             output, _ = model(data)
-            loss = criterion(output, label)
+            loss = criterion(output, label, class_weights)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
 
         train_loss /= len(train_loader)
         
-        val_loss, val_metrics = validate_func(model, val_loader, criterion, device)
+        val_loss, val_metrics = validate_func(model, val_loader, criterion, device, class_weights)
         
         logger.info(f"Epoch {epoch+1}/{cfg.num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
         
         if monitor:
             monitor.add_scalar('Train loss', train_loss, epoch+1)
             monitor.add_scalar('Val loss', val_loss, epoch+1)
-
-            monitor.add_hparams({'batch_size': cfg.batch_size,
-                                'lr': cfg.optimizer.params.lr,
-                                'weight_decay': cfg.optimizer.params.weight_decay,
-                                'stratification': cfg.stratify},
-                                {'accuracy': val_metrics['accuracy']},
-                                run_name='runs/hparams',
-                                global_step=epoch+1,
-                                )
+            monitor.add_scalar('Accuracy', val_metrics['accuracy'], epoch+1)  
 
         # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            best_val_score = val_metrics['f1_score']
             early_stopping_counter = 0
             best_model = deepcopy(model)
         else:
@@ -76,9 +79,21 @@ def train_nn(model: nn.Module, dataset: DataFrame, labels: array, validate_func:
             if early_stopping_counter >= cfg.early_stopping_patience:
                 logger.info(f"Early stopping triggered after {epoch+1} epochs")
                 break
-    
-    val_loss, validation_metrics, probas = validate_func(best_model, val_loader, criterion, device, return_data=True)
+            
+    hparams = {'batch_size': cfg.batch_size,
+            'lr': cfg.optimizer.params.lr,
+            'weight_decay': cfg.optimizer.params.weight_decay,
+            'stratification': cfg.stratify,
+            'hidden_layers': cfg.hidden_layers,
+            'select_features': cfg.select_features,
+            'percent_change_threshold': cfg.percent_change_threshold,
+            'min_time_interval': cfg.min_time_interval}
+    metrics = {'Accuracy': best_val_score}
 
-    return best_model, logs, validation_metrics, (data_val, labels_val, argmax(probas, axis=1), probas)
+    monitor.add_hparams(hparam_dict=hparams, metric_dict=metrics, run_name='hparam')
+    
+    val_loss, validation_metrics, probas = validate_func(best_model, val_loader, criterion, device, class_weights, return_data=True)
+
+    return best_model, best_val_score, validation_metrics, (data_val, labels_val, argmax(probas, axis=1), probas)
 
 

@@ -1,5 +1,6 @@
 random_state: 42
 test_size: 0.3
 shuffle: True
-stratify: True
+stratify: False
 select_features: False
+class_weight: 'balanced'

@@ -6,20 +6,13 @@ import config
 import asyncio
 import logging
 
-class Observer:
-    def update(self, data: dict):
-        pass
-
 logging.getLogger("tinkoff.invest.logging").setLevel(logging.INFO)
 
 ## config.update_files()
-test_observer = Observer()
-
 @hydra.main(version_base=None, config_path='D:/Tinkoff-Trade-Assistant/config', config_name='general.yaml')
 def main(cfg: DictConfig) -> None:
     dm = DataManager(cfg)
     dc = DataCollector(cfg, data_manager=dm)
-    dc.attach(test_observer)
     asyncio.run(dc.run())
 
 main()

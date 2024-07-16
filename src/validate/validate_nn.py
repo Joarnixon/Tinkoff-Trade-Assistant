@@ -2,7 +2,7 @@ import torch
 from numpy import argmax
 from src.model.metrics import *
 
-def val_nn(model, val_loader, criterion, device, return_data=False):
+def val_nn(model, val_loader, criterion, device, class_weights, return_data=False):
     model.eval()
     val_loss = 0.0
     all_preds = []
@@ -12,7 +12,7 @@ def val_nn(model, val_loader, criterion, device, return_data=False):
         for data, label in val_loader:
             data, label = data.to(device), label.to(device).squeeze(-1)
             output, preds = model(data)
-            loss = criterion(output, label)
+            loss = criterion(output, label, class_weights)
             val_loss += loss.item()
             all_preds.extend(torch.softmax(preds, dim=1).cpu().numpy())
             all_labels.extend(label.cpu().numpy())

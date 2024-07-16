@@ -107,9 +107,9 @@ class DataCollector(Subject):
         self.single_data_write_delay = cfg.data.data_gather.single_data_write_delay
 
         # set initial price
-        # with Client(cfg.tokens.TOKEN) as client:
-        #     for share in list(self.shares_dict.values()):
-        #         share.last_price = qtd(client.market_data.get_last_prices(figi=[share.figi]).last_prices[0].price)
+        with Client(cfg.tokens.TOKEN) as client:
+            for share in list(self.shares_dict.values()):
+                share.last_price = qtd(client.market_data.get_last_prices(figi=[share.figi]).last_prices[0].price)
 
     # Modify this to take more data if you know how. Change columns in config
     @staticmethod

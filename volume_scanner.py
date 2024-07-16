@@ -79,7 +79,6 @@ class VolumeScan(Subject):
         if figi not in self.buffer:
             return []
         l = len(self.buffer[figi]) 
-        num_candles_to_return = max(l - info, 0)
         candles = list(islice(self.buffer[figi], info, l))
         return candles
     

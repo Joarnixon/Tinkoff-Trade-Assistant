@@ -1,10 +1,14 @@
 random_state: 4242
 test_size: 0.3
-shuffle: False
+shuffle: True
 stratify: False
 device: 'cpu'
-batch_size: 10
-num_epochs: 20
+batch_size: 30
+num_epochs: 40
+weights:
+  - 1
+  - 1
+  - 1
 early_stopping_patience: 10
 select_features: False
 

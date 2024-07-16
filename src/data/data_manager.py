@@ -2,7 +2,7 @@ import os
 import json
 import ast
 from torch.nn import Module
-import joblib
+import pickle
 from torch import save
 from polars import read_csv, DataFrame
 from typing import Union, Optional
@@ -182,19 +182,45 @@ class DataManager:
             with open(self.cfg.paths.selected_features, mode='w') as f:
                 json.dump(selected_features_dict, f)
     
-    def save_model(self, model, figi, save_best=False):
+    def save_model(self, model, best_score, figi):
+        """Saves the model"""
         model_type = model.__class__.__name__
         model_path = os.path.join(self.cfg.paths.models, figi)
+        metadata_file = os.path.join(model_path, "metadata.json")
 
         if isinstance(model, Module):
-            # Save PyTorch model
+            filename = f"{model_type}.pth"
             checkpoint = {'model': model, 'state_dict': model.state_dict()}
-            if not save_best:
-                save(checkpoint, f"{model_path}/{model_type}.pth")
-            else:
-                save(checkpoint, f"{model_path}/best.pth")
+            save(checkpoint, os.path.join(model_path, filename))
         else:
-            if not save_best:
-                joblib.dump(model, f"{model_path}/{model_type}.joblib")
-            else:
-                joblib.dump(model, f"{model_path}/best.joblib")
+            filename = f"{model_type}.joblib"
+            with open(os.path.join(model_path, filename), 'wb') as f:
+                pickle.dump(model, f)
+        try:
+            with open(metadata_file, 'r') as f:
+                ensemble_data = json.load(f)
+        except FileNotFoundError:
+            ensemble_data = {'models': []}
+
+        found_existing = False
+        for i, model_info in enumerate(ensemble_data['models']):
+            if model_info['filename'] == filename:
+                # Update existing model's information
+                ensemble_data['models'][i] = {
+                    'filename': filename,
+                    'score': best_score,
+                    'model_type': model_type
+                }
+                found_existing = True
+                break
+
+        # If it's a new model (not an update), then append
+        if not found_existing: 
+            ensemble_data['models'].append({
+                'filename': filename,
+                'score': best_score,
+                'model_type': model_type
+            })
+
+        with open(metadata_file, 'w') as f:
+            json.dump(ensemble_data, f, indent=4) 

@@ -9,9 +9,10 @@ from src.visualise import plot_predictions
 from typing import Union, Optional
 from torch import manual_seed
 from torch.utils.tensorboard import SummaryWriter
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
 import polars as pl
+import time
 
 class TrainPipeline:
     """
@@ -31,10 +32,10 @@ class TrainPipeline:
         self.data_pipeline = DataPipelineFactory.create_offline_pipeline(cfg)
 
         self.model_cfg = model_cfg
-        self.train_cfg = train_cfg
+        self.train_cfg = OmegaConf.merge(train_cfg, model_cfg, cfg.data.data_labeling)
 
         self.figi = figi
-        self.monitor = monitor if monitor is not None else SummaryWriter(f'runs/{figi}')
+        self.monitor = monitor if monitor is not None else SummaryWriter(f'runs/offline/{figi}/{str(time.time())}')
 
 
     def prepare_data(self, figi):
@@ -53,7 +54,7 @@ class TrainPipeline:
         self.data_manager.write_processed_share_labels(self.figi, labels)
         return data, labels
 
-    def train(self, show_validation=False, save_best=False, figi=None):
+    def train(self, show_validation=False, figi=None):
         if figi is None:
             figi = self.figi
         data, labels = self.prepare_data(figi)
@@ -65,15 +66,15 @@ class TrainPipeline:
             elif hasattr(self.model_cfg, '_target_'):
                 self.model = instantiate(self.model_cfg)
 
-        model, logs, validation_metrics, validation_data = self.train_func(
+        model, best_score, validation_metrics, validation_data = self.train_func(
             self.model, data, labels, self.validate_func,
             self.logger, self.monitor, self.train_cfg
         )
-        self.data_manager.save_model(model, figi, save_best=save_best)
+        self.data_manager.save_model(model, best_score, figi)
         if show_validation:
             data_val, labels_val, predicted, probas = validation_data
             plot_predictions(data_val, predicted, probas)
-        return model, logs, validation_metrics, validation_data
+        return model, best_score, validation_metrics, validation_data
 
 
 class TrainPipelineFactory:

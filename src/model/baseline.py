@@ -2,14 +2,14 @@ from sklearn.linear_model import LogisticRegression
 from src.model.base_model import Model
 import torch.nn as nn
 import torch.nn.functional as F
-from numpy import max
+from numpy import max, ndarray
 from torch import argmax, tensor, float32
 
 class LinearModel(Model):
     def __init__(self, args):
         self.model = LogisticRegression(**args)
         
-    def predict(self, X):
+    def predict(self, X: ndarray):
         return self.model.predict(X), self.model.predict_proba(X)
     
     def fit(self, X, y):
@@ -25,7 +25,7 @@ class LinearNN(nn.Module):
         preds = self.net(x)
         return preds, F.softmax(preds, dim=1)
     
-    def predict(self, x):
-        x = tensor(x, dtype=float32).squeeze(0)
+    def predict(self, x: ndarray):
+        x = tensor(x, dtype=float32)
         preds, probas = self.forward(x)
         return argmax(preds, dim=1).cpu().numpy(), probas.detach().cpu().numpy()

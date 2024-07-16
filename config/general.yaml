@@ -8,10 +8,11 @@ paths:
   trend_data: ${.project}\data\trend.csv
   selected_features: ${.project}\data\selected_features.json
   processed_data: ${.project}\data\processed
+  online_metric_metadata: ${.project}\src\evaluation
 
 tokens:
   TOKEN:
-  TOKEN_SANDBOX: 
+  TOKEN_SANDBOX:
   TELEGRAM_TOKEN: 'Provide your Telegram API token'
 
 data:
@@ -40,14 +41,13 @@ data:
   data_labeling:
     time_column_name: time # modify this too if you modified any of the columns above
     price_column_name: price_last
-    percent_change_threshold: 0.2
-    min_time_interval: 90
+    percent_change_threshold: 0.4
+    min_time_interval: 120
     max_time_interval: 300
     label_meaning:
       hold: 0
       buy: 1
       sell: 2
-
   mean_volume:
     update_interval_days: 2
     candle_interval: 15_MIN

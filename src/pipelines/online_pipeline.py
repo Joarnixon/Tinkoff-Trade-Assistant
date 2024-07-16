@@ -6,44 +6,42 @@ import numpy as np
 import torch
 import os
 from polars import DataFrame
-from src.model.load_model import load_nn
+from omegaconf import OmegaConf
+from server.routers.shares import model_available
 from src.model.baseline import LinearNN
+from src.model.load_model import ModelLoader
 from src.pipelines.data_pipeline import DataPipelineFactory
 from src.data.subject import Subject
 from src.features.feature_selection import SelectFeatures
 
 class OnlinePredictions(Subject):
-    def __init__(self, cfg, figi=None):
+    def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.figi = figi
+        self.figi = {figi: True for figi in OmegaConf.load(str(cfg.paths.shares_dict)) if model_available(figi, cfg.paths.models)}
         self.df_schema = self.cfg.data.raw_data_trades_columns + [f"{column}_{proc}" for column in self.cfg.data.raw_data_orderbook_columns for proc in (self.cfg.data.data_gather.orderbook_processes + ['last'])]
         self.data_pipeline = DataPipelineFactory.create_online_pipeline(cfg)
         self.feature_selector = SelectFeatures(cfg)
-        self.models: Dict[str, object] = {}  # Dictionary to store models for each share
+        self.loader = ModelLoader(cfg, k=2)
         self.data_queue = asyncio.Queue()  # Queue to store incoming data points
         self.prediction_queue = queue.Queue()  # Queue to store predictions
         self.max_queue_size = cfg.get('max_queue_size', 10)
         self.batch_size = cfg.get('batch_size', 32)
         self.executor = ThreadPoolExecutor(max_workers=cfg.get('max_workers', 4))
         
-        self._load_models(self.figi)
-
     async def run(self):
         await asyncio.gather(
             self._process_data(),
             self._make_predictions()
         )
 
-    def _load_models(self, figi):
-        filename = os.path.join(self.cfg.paths.models, figi, 'best.pth')
-        model = load_nn(filename)
-        self.models[figi] = model
+    def get_model(self, figi):
+        return self.loader.load(figi)
 
     async def update(self, data_point: Dict[str, np.ndarray]):
         if self.data_queue.qsize() < self.max_queue_size:
             recieved_figi = next(iter(data_point))
-            if self.figi is None or recieved_figi == self.figi:
+            if self.figi is None or recieved_figi in self.figi:
                 data_point[recieved_figi] = DataFrame(data_point[recieved_figi], schema=self.df_schema)
                 await self.data_queue.put(data_point)
         else:
@@ -55,11 +53,10 @@ class OnlinePredictions(Subject):
             batch = []
             while len(batch) < self.batch_size:
                 try:
-                    data_point = await asyncio.wait_for(self.data_queue.get(), timeout=0.1)
+                    data_point = await asyncio.wait_for(self.data_queue.get(), timeout=0.5)
                     batch.append(data_point)
                 except asyncio.TimeoutError:
-                    break  # Process partial batch if no new data arrives within timeout
-            
+                    break
             if batch:
                 processed_batch = await self._preprocess_batch(batch)
                 self.prediction_queue.put(processed_batch)
@@ -86,7 +83,7 @@ class OnlinePredictions(Subject):
         predictions = {}
         futures = []
         for figi, features in batch:
-            model = self.models[figi]
+            model = self.get_model(figi)
             futures.append((figi, self.executor.submit(self._predict_single, model, features)))
         
         for figi, future in futures:
@@ -96,5 +93,5 @@ class OnlinePredictions(Subject):
         return predictions
 
     def _predict_single(self, model, features: DataFrame):
-        prediction, proba = model.predict(np.array([features]))
+        prediction, proba = model.predict(np.array(features))
         return {'result': prediction.tolist(), 'probability': proba.tolist()}

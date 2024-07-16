@@ -41,6 +41,8 @@ class SelectFeatures:
         return X_selected.insert_column(0, time_column)
     
     def fit_transform_online(self, X: pl.DataFrame, figi: Optional[str] = None):
+        if figi not in self.preselected_features:
+            return X.drop('time')
         return X.select(self.preselected_features[figi])
 
     def _random_forest_selection(self, X, y, k):
